@@ -29,16 +29,21 @@ contract Practice {
     // Remove token from owner's token list
     function _removeTokenFromList(address from, uint256 tokenId) private {
         // [10, 15, 19, 20] -> [10, 15, 20, 19] -> [10, 15, 20]
+        uint256 lastTokenIndex = _ownedTokens[from].length - 1;
         for (uint256 i = 0; i < _ownedTokens[from].length; i++) {
             if (tokenId == _ownedTokens[from][i]) {
-                // Swap last token with deleting token
-                uint256 temp = tokenId;
-                tokenId = _ownedTokens[from][i];
-                _ownedTokens[from][i] = temp;
+                if (
+                    _ownedTokens[from].length != 1 &&
+                    tokenId != _ownedTokens[from][lastTokenIndex]
+                ) {
+                    // Swap last token with deleting token
+                    _ownedTokens[from][i] = _ownedTokens[from][lastTokenIndex];
+                    _ownedTokens[from][lastTokenIndex] = tokenId;
+                }
                 break;
             }
-            _ownedTokens[from].pop();
         }
+        _ownedTokens[from].pop();
     }
 
     // Change owner (from -> to)
