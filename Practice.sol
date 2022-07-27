@@ -30,17 +30,17 @@ contract Practice {
     function _removeTokenFromList(address from, uint256 tokenId) private {
         // [10, 15, 19, 20] -> [10, 15, 20, 19] -> [10, 15, 20]
         uint256 lastTokenIndex = _ownedTokens[from].length - 1;
-        for (uint256 i = 0; i < _ownedTokens[from].length; i++) {
-            if (tokenId == _ownedTokens[from][i]) {
-                if (
-                    _ownedTokens[from].length != 1 &&
-                    tokenId != _ownedTokens[from][lastTokenIndex]
-                ) {
+        if (
+            _ownedTokens[from].length != 1 &&
+            tokenId != _ownedTokens[from][lastTokenIndex]
+        ) {
+            for (uint256 i = 0; i < _ownedTokens[from].length; i++) {
+                if (tokenId == _ownedTokens[from][i]) {
                     // Swap last token with deleting token
                     _ownedTokens[from][i] = _ownedTokens[from][lastTokenIndex];
                     _ownedTokens[from][lastTokenIndex] = tokenId;
+                    break;
                 }
-                break;
             }
         }
         _ownedTokens[from].pop();
