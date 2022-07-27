@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity >=0.7.0 <0.9.0;
 
-contract Practice {
+contract NFTSimple {
     string public name = "KlayLion";
     string public symbol = "KL";
 
@@ -74,5 +74,16 @@ contract Practice {
     // Set token uri
     function setTokenUri(uint256 id, string memory uri) public {
         tokenURIs[id] = uri;
+    }
+}
+
+contract NFTMarket {
+    function buyNFT(
+        uint256 tokenId,
+        address NFTAddress,
+        address to
+    ) public returns (bool) {
+        NFTSimple(NFTAddress).safeTransferFrom(address(this), to, tokenId);
+        return true;
     }
 }
