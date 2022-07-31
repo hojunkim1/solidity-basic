@@ -5,9 +5,23 @@ contract NFTSimple {
     string public name = "KlayLion";
     string public symbol = "KL";
 
+    // onKIP17Received bytes value
+    bytes4 private constant _KIP17_RECEIVED =
+        bytes4(keccak256("onKIP17Received(address,address,uint256,bytes)"));
+
     mapping(uint256 => address) public tokenOwner;
     mapping(uint256 => string) public tokenURIs;
     mapping(address => uint256[]) private _ownedTokens; // 소유한 토큰 리스트
+
+    // Show owned Tokens
+    function ownedTokens(address owner) public view returns (uint256[] memory) {
+        return _ownedTokens[owner];
+    }
+
+    // Set token uri
+    function setTokenUri(uint256 id, string memory uri) public {
+        tokenURIs[id] = uri;
+    }
 
     // Mint token : save owner and uri by token id
     function mintWithTokenURI(
@@ -24,6 +38,33 @@ contract NFTSimple {
         _ownedTokens[to].push(tokenId);
 
         return true;
+    }
+
+    // Change owner (from -> to)
+    function safeTransferFrom(
+        address from,
+        address to,
+        uint256 tokenId,
+        bytes memory _data
+    ) public {
+        require(from == msg.sender, "from != msg.sender");
+        require(
+            from == tokenOwner[tokenId],
+            "you are not the owner of the token."
+        );
+
+        // delete my token and push token to another owner
+        _removeTokenFromList(from, tokenId);
+        _ownedTokens[to].push(tokenId);
+
+        // save this token to new owner's list
+        tokenOwner[tokenId] = to;
+
+        // 받는 쪽이 실행할 코드가 있는 스마트 컨트렉트라면 코드를 실행할 것
+        require(
+            _checkOnKIP17Received(from, to, tokenId, _data),
+            "KIP17: transfer to non KIP17Receiver implementer"
+        );
     }
 
     // Remove token from owner's token list
@@ -46,44 +87,83 @@ contract NFTSimple {
         _ownedTokens[from].pop();
     }
 
-    // Change owner (from -> to)
-    function safeTransferFrom(
+    // Check block has code
+    function isContract(address account) internal view returns (bool) {
+        uint256 size;
+        assembly {
+            size := extcodesize(account)
+        }
+        return size > 0;
+    }
+
+    // Check data is KIP17
+    function _checkOnKIP17Received(
         address from,
         address to,
-        uint256 tokenId
-    ) public {
-        require(from == msg.sender, "from != msg.sender");
-        require(
-            from == tokenOwner[tokenId],
-            "you are not the owner of the token."
+        uint256 tokenId,
+        bytes memory _data
+    ) internal returns (bool) {
+        bool success;
+        bytes memory returndata;
+
+        if (!isContract(to)) {
+            return true;
+        }
+
+        (success, returndata) = to.call(
+            abi.encodeWithSelector(
+                _KIP17_RECEIVED,
+                msg.sender,
+                from,
+                tokenId,
+                _data
+            )
         );
 
-        // delete my token and push token to another owner
-        _removeTokenFromList(from, tokenId);
-        _ownedTokens[to].push(tokenId);
+        if (
+            returndata.length != 0 &&
+            abi.decode(returndata, (bytes4)) == _KIP17_RECEIVED
+        ) {
+            return true;
+        }
 
-        // save this token to new owner's list
-        tokenOwner[tokenId] = to;
-    }
-
-    // Show owned Tokens
-    function ownedTokens(address owner) public view returns (uint256[] memory) {
-        return _ownedTokens[owner];
-    }
-
-    // Set token uri
-    function setTokenUri(uint256 id, string memory uri) public {
-        tokenURIs[id] = uri;
+        return false;
     }
 }
 
 contract NFTMarket {
-    function buyNFT(
-        uint256 tokenId,
-        address NFTAddress,
-        address to
-    ) public returns (bool) {
-        NFTSimple(NFTAddress).safeTransferFrom(address(this), to, tokenId);
+    mapping(uint256 => address) public seller;
+
+    // Buy NFT
+    function buyNFT(address NFTAddress, uint256 tokenId)
+        public
+        payable
+        returns (bool)
+    {
+        // set seller "KLAY-receivable" form
+        address payable receiver = payable(seller[tokenId]);
+
+        // send 0.01 KLAY : 10**16 PED = 0.01 KLAY
+        receiver.transfer(10**16);
+
+        NFTSimple(NFTAddress).safeTransferFrom(
+            address(this),
+            msg.sender,
+            tokenId,
+            "0x00"
+        );
         return true;
+    }
+
+    // Record seller : on token received
+    function onKIP17Received(
+        address operator,
+        address from,
+        uint256 tokenId,
+        bytes memory data
+    ) public returns (bytes4) {
+        seller[tokenId] = from;
+        return
+            bytes4(keccak256("onKIP17Received(address,address,uint256,bytes)"));
     }
 }
