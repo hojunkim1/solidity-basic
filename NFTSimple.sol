@@ -1,13 +1,6 @@
 pragma solidity ^0.5.0;
 
 library SafeMath {
-    function add(uint256 a, uint256 b) internal pure returns (uint256) {
-        uint256 c = a + b;
-        require(c >= a, "SafeMath: addition overflow");
-
-        return c;
-    }
-
     function sub(uint256 a, uint256 b) internal pure returns (uint256) {
         return sub(a, b, "SafeMath: subtraction overflow");
     }
@@ -21,6 +14,16 @@ library SafeMath {
         uint256 c = a - b;
 
         return c;
+    }
+}
+
+library Address {
+    function isContract(address account) internal view returns (bool) {
+        uint256 size;
+        assembly {
+            size := extcodesize(account)
+        }
+        return size > 0;
     }
 }
 
@@ -45,6 +48,7 @@ library Counters {
 }
 
 contract NFTSimple {
+    using Address for address;
     using Counters for Counters.Counter;
 
     event Transfer(
@@ -67,16 +71,6 @@ contract NFTSimple {
     mapping(uint256 => address) private _tokenOwner;
     mapping(uint256 => address) private _tokenApprovals;
     mapping(address => Counters.Counter) private _ownedTokensCount;
-
-    // Show owned Tokens
-    function ownedTokens(address owner) public view returns (uint256[] memory) {
-        return _ownedTokens[owner];
-    }
-
-    // Set token uri
-    function setTokenUri(uint256 id, string memory uri) public {
-        tokenURIs[id] = uri;
-    }
 
     function balanceOf(address owner) public view returns (uint256) {
         require(
@@ -175,15 +169,6 @@ contract NFTSimple {
         _ownedTokens[from].pop();
     }
 
-    // Check block has code
-    function isContract(address account) internal view returns (bool) {
-        uint256 size;
-        assembly {
-            size := extcodesize(account)
-        }
-        return size > 0;
-    }
-
     // Check data is KIP17
     function _checkOnKIP17Received(
         address from,
@@ -194,7 +179,7 @@ contract NFTSimple {
         bool success;
         bytes memory returndata;
 
-        if (!isContract(to)) {
+        if (!to.isContract()) {
             return true;
         }
 
@@ -222,6 +207,16 @@ contract NFTSimple {
         if (_tokenApprovals[tokenId] != address(0)) {
             _tokenApprovals[tokenId] = address(0);
         }
+    }
+
+    // Show owned Tokens
+    function ownedTokens(address owner) public view returns (uint256[] memory) {
+        return _ownedTokens[owner];
+    }
+
+    // Set token uri
+    function setTokenUri(uint256 id, string memory uri) public {
+        tokenURIs[id] = uri;
     }
 }
 
