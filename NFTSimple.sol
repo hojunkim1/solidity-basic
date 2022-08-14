@@ -1,7 +1,58 @@
-// SPDX-License-Identifier: GPL-3.0
-pragma solidity >=0.7.0 <0.9.0;
+pragma solidity ^0.5.0;
+
+library SafeMath {
+    function add(uint256 a, uint256 b) internal pure returns (uint256) {
+        uint256 c = a + b;
+        require(c >= a, "SafeMath: addition overflow");
+
+        return c;
+    }
+
+    function sub(uint256 a, uint256 b) internal pure returns (uint256) {
+        return sub(a, b, "SafeMath: subtraction overflow");
+    }
+
+    function sub(
+        uint256 a,
+        uint256 b,
+        string memory errorMessage
+    ) internal pure returns (uint256) {
+        require(b <= a, errorMessage);
+        uint256 c = a - b;
+
+        return c;
+    }
+}
+
+library Counters {
+    using SafeMath for uint256;
+
+    struct Counter {
+        uint256 _value;
+    }
+
+    function current(Counter storage counter) internal view returns (uint256) {
+        return counter._value;
+    }
+
+    function increment(Counter storage counter) internal {
+        counter._value += 1;
+    }
+
+    function decrement(Counter storage counter) internal {
+        counter._value = counter._value.sub(1);
+    }
+}
 
 contract NFTSimple {
+    using Counters for Counters.Counter;
+
+    event Transfer(
+        address indexed from,
+        address indexed to,
+        uint256 indexed tokenId
+    );
+
     string public name = "KlayLion";
     string public symbol = "KL";
 
@@ -13,6 +64,10 @@ contract NFTSimple {
     mapping(uint256 => string) public tokenURIs;
     mapping(address => uint256[]) private _ownedTokens; // 소유한 토큰 리스트
 
+    mapping(uint256 => address) private _tokenOwner;
+    mapping(uint256 => address) private _tokenApprovals;
+    mapping(address => Counters.Counter) private _ownedTokensCount;
+
     // Show owned Tokens
     function ownedTokens(address owner) public view returns (uint256[] memory) {
         return _ownedTokens[owner];
@@ -23,21 +78,23 @@ contract NFTSimple {
         tokenURIs[id] = uri;
     }
 
-    // Mint token : save owner and uri by token id
-    function mintWithTokenURI(
-        address to,
-        uint256 tokenId,
-        string memory tokenURI
-    ) public returns (bool) {
-        // give an owner to tokens
-        // save uri in the token
-        tokenOwner[tokenId] = to;
-        tokenURIs[tokenId] = tokenURI;
+    function balanceOf(address owner) public view returns (uint256) {
+        require(
+            owner != address(0),
+            "KIP17: balance query for the zero address"
+        );
 
-        // add token to the owner's list
-        _ownedTokens[to].push(tokenId);
+        return _ownedTokensCount[owner].current();
+    }
 
-        return true;
+    function ownerOf(uint256 tokenId) public view returns (address) {
+        address owner = _tokenOwner[tokenId];
+        require(
+            owner != address(0),
+            "KIP17: owner query for nonexistent token"
+        );
+
+        return owner;
     }
 
     // Change owner (from -> to)
@@ -65,6 +122,37 @@ contract NFTSimple {
             _checkOnKIP17Received(from, to, tokenId, _data),
             "KIP17: transfer to non KIP17Receiver implementer"
         );
+    }
+
+    // Mint token : save owner and uri by token id
+    function mintWithTokenURI(
+        address to,
+        uint256 tokenId,
+        string memory tokenURI
+    ) public returns (bool) {
+        // give an owner to tokens
+        // save uri in the token
+        tokenOwner[tokenId] = to;
+        tokenURIs[tokenId] = tokenURI;
+
+        // add token to the owner's list
+        _ownedTokens[to].push(tokenId);
+
+        return true;
+    }
+
+    function burn(address owner, uint256 tokenId) public {
+        require(
+            ownerOf(tokenId) == owner,
+            "KIP17: burn of token that is not own"
+        );
+
+        _clearApproval(tokenId);
+
+        _ownedTokensCount[owner].decrement();
+        _tokenOwner[tokenId] = address(0);
+
+        emit Transfer(owner, address(0), tokenId);
     }
 
     // Remove token from owner's token list
@@ -129,6 +217,12 @@ contract NFTSimple {
 
         return false;
     }
+
+    function _clearApproval(uint256 tokenId) private {
+        if (_tokenApprovals[tokenId] != address(0)) {
+            _tokenApprovals[tokenId] = address(0);
+        }
+    }
 }
 
 contract NFTMarket {
@@ -141,7 +235,7 @@ contract NFTMarket {
         returns (bool)
     {
         // set seller "KLAY-receivable" form
-        address payable receiver = payable(seller[tokenId]);
+        address payable receiver = address(uint160(seller[tokenId]));
 
         // send 0.01 KLAY : 10**16 PED = 0.01 KLAY
         receiver.transfer(10**16);
