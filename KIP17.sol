@@ -638,19 +638,7 @@ contract MinterRole {
         _addMinter(msg.sender);
     }
 
-    modifier onlyMinter() {
-        require(
-            isMinter(msg.sender),
-            "MinterRole: caller does not have the Minter role"
-        );
-        _;
-    }
-
-    function isMinter(address account) public view returns (bool) {
-        return _minters.has(account);
-    }
-
-    function addMinter(address account) public onlyMinter {
+    function addMinter(address account) public {
         _addMinter(account);
     }
 
@@ -680,7 +668,7 @@ contract KIP17MetadataMintable is KIP13, KIP17, KIP17Metadata, MinterRole {
         address to,
         uint256 tokenId,
         string memory tokenURI
-    ) public onlyMinter returns (bool) {
+    ) public returns (bool) {
         _mint(to, tokenId);
         _setTokenURI(tokenId, tokenURI);
         return true;
@@ -694,11 +682,7 @@ contract KIP17Mintable is KIP17, MinterRole {
         _registerInterface(_INTERFACE_ID_KIP17_MINTABLE);
     }
 
-    function mint(address to, uint256 tokenId)
-        public
-        onlyMinter
-        returns (bool)
-    {
+    function mint(address to, uint256 tokenId) public returns (bool) {
         _mint(to, tokenId);
         return true;
     }
